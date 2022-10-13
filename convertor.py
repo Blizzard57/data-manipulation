@@ -7,6 +7,9 @@ from array import array
 from os.path import exists
 from pyHepMC3.rootIO import HepMC3 as hmrootIO
 from pyHepMC3 import HepMC3 as hm
+import ROOT as r
+from tqdm import tqdm
+import argparse
 
 class Convert():
     '''
@@ -17,16 +20,6 @@ class Convert():
         - ROOT -> HEPMC2 (The compatible file)
         - LHE -> ROOT
         - ROOT -> LHE (The compatible file)
-
-    Support is coming for :
-        - HEPMC2 -> HDF5
-        - LHE -> HDF5
-    
-    Conversions that does not work :
-        - HEPMC2 -> LHE
-
-    Converisons whose implementation is unknown :
-        - ROOT -> HDF5
 
     Attributes :
     ------------
@@ -59,10 +52,6 @@ class Convert():
 
     convert_lhe_root()
         Convert LHE file to ROOT file
-
-    convert_root_lhe()
-        Convert previously converted LHE file
-        back to LHE from ROOT
 
     sanitize_format()
         Helper function that allows any uppercase
@@ -190,6 +179,53 @@ class Convert():
         input_hep.close()
         output_root.close()
 
+    def __convert_hepmc3_root(self):
+        '''
+        Convert the HEPMC3 file to ROOT file
+
+        Parameters :
+        ------------
+        None
+
+        Exceptions :
+        ------------
+        ValueError
+            The error is thrown if the HEPMC file 
+            cannot be read
+
+            The error is thrown if the ROOT file
+            cannot be opened
+
+        Returns :
+        ---------
+        None
+        '''
+
+        input_hep = hm.ReaderAscii(self.input_file)
+
+        if input_hep.failed():
+            raise ValueError('ERROR : Could not read HepMC3 file successfully.')
+
+        output_root = hmrootIO.WriterRootTree(self.output_file)
+        if output_root.failed():
+            raise ValueError('ERROR : Could not open ROOT file successfully.')
+
+        pb = tqdm()
+
+        while not input_hep.failed():
+            evt = hm.GenEvent()
+            input_hep.read_event(evt)
+            pb.update(1)
+            if input_hep.failed():
+                print("INFO : File successfully converted")
+                break
+
+            output_root.write_event(evt)
+            evt.clear()
+
+        input_hep.close()
+        output_root.close()
+
     def __convert_root_hepmc2(self):
         '''
         Convert the ROOT file to HepMC2 file
@@ -233,6 +269,144 @@ class Convert():
 
         input_root.close()
         output_hep.close()
+
+    def __convert_root_hepmc3(self):
+        '''
+        Convert the ROOT file to HepMC3 file
+
+        Parameters :
+        ------------
+        None
+
+        Exceptions :
+        ------------
+        ValueError
+            The error is thrown if the ROOT file 
+            cannot be read
+
+            The error is thrown if the HEPMC file
+            cannot be opened
+
+        Returns :
+        ---------
+        None
+        '''
+        input_root = hmrootIO.ReaderRootTree(self.input_file)
+        if input_root.failed():
+            raise ValueError('ERROR : Could not read ROOT file successfully.')
+
+        output_hep = hm.WriterAscii(self.output_file)
+        if output_hep.failed():
+            raise ValueError('ERROR : Could not open HepMC3 file successfully.')
+
+        pb = tqdm()
+
+        while not input_root.failed():
+            evt = hm.GenEvent()
+            input_root.read_event(evt)
+            pb.update(1)
+            if input_root.failed():
+                print("INFO : File successfully converted")
+                break
+            output_hep.write_event(evt)
+            evt.clear()
+
+        input_root.close()
+        output_hep.close()
+
+    def __convert_hepmc2_hepmc3(self):
+        '''
+        Convert the HEPMC2 file to HEPMC3 file
+
+        Parameters :
+        ------------
+        None
+
+        Exceptions :
+        ------------
+        ValueError
+            The error is thrown if the HEPMC2 file 
+            cannot be read
+
+            The error is thrown if the HEPMC3 file
+            cannot be opened
+
+        Returns :
+        ---------
+        None
+        '''
+
+        input_hp2 = hm.ReaderAsciiHepMC2(self.input_file)
+
+        if input_hp2.failed():
+            raise ValueError('ERROR : Could not read HepMC2 file successfully.')
+
+        output_hm3 = hm.WriterAscii(self.output_file)
+        if output_hm3.failed():
+            raise ValueError('ERROR : Could not open HEPMC3 file successfully.')
+
+        pb = tqdm()
+
+        while not input_hp2.failed():
+            evt = hm.GenEvent()
+            input_hp2.read_event(evt)
+            pb.update(1)
+            if input_hp2.failed():
+                print("INFO : File successfully converted")
+                break
+
+            output_hm3.write_event(evt)
+            evt.clear()
+
+        input_hp2.close()
+        output_hm3.close()
+
+    def __convert_hepmc3_hepmc2(self):
+        '''
+        Convert the HEPMC3 file to HEPMC2 file
+
+        Parameters :
+        ------------
+        None
+
+        Exceptions :
+        ------------
+        ValueError
+            The error is thrown if the HEPMC3 file 
+            cannot be read
+
+            The error is thrown if the HEPMC2 file
+            cannot be opened
+
+        Returns :
+        ---------
+        None
+        '''
+
+        input_hm3 = hm.ReaderAscii(self.input_file)
+
+        if input_hm3.failed():
+            raise ValueError('ERROR : Could not read HepMC3 file successfully.')
+
+        output_hm2 = hm.WriterAsciiHepMC2(self.output_file)
+        if output_hm2.failed():
+            raise ValueError('ERROR : Could not open HEPMC2 file successfully.')
+
+        pb = tqdm()
+
+        while not input_hm3.failed():
+            evt = hm.GenEvent()
+            input_hm3.read_event(evt)
+            pb.update(1)
+            if input_hm3.failed():
+                print("INFO : File successfully converted")
+                break
+
+            output_hm2.write_event(evt)
+            evt.clear()
+
+        input_hm3.close()
+        output_hm2.close()
 
     def __convert_lhe_root(self):
         '''
@@ -337,7 +511,6 @@ class Convert():
 
                 t1.Fill()
 
-        t1.Print()
         t1.Write()
         f1.Close()
 
@@ -379,13 +552,19 @@ class Convert():
         '''
         self.convert_dict = {
             'root' : {
-                'hepmc2' : self.__convert_root_hepmc2
+                'hepmc2' : self.__convert_root_hepmc2,
+                'hepmc3' : self.__convert_root_hepmc3
                 },
             'hepmc2' : {
-                'root' : self.__convert_hepmc2_root
+                'root' : self.__convert_hepmc2_root,
+                'hepmc3' : self.__convert_hepmc2_hepmc3
                 },
             'lhe' : {
                 'root' : self.__convert_lhe_root
+            },
+            'hepmc3' : { 
+                'root' : self.__convert_hepmc3_root,
+                'hepmc2' : self.__convert_hepmc3_hepmc2
             }
         }
 
@@ -428,3 +607,36 @@ class Convert():
         output_format = self.__sanitize_format(output_format)
 
         self.convert_dict[input_format][output_format]()
+
+def parseRes():
+    '''
+    The function allows interpretation of command line arguments and parse them to the further functions.
+    '''
+    parser = argparse.ArgumentParser(description='''This program allows conversions between various Monte Carlo 
+                                    file formats. The following conversions are supported : 
+                                    [HEPMC3 -> HEPMC2,HEPMC2 -> HEPMC3,HEPMC3 -> ROOT,ROOT -> HEPMC3,
+                                    HEPMC2 -> ROOT,ROOT -> HEPMC2,LHE -> ROOT,ROOT -> LHE]''')
+
+    parser.add_argument("-i","--input-file",type=str,metavar="I",required=True,
+                        help="The input file that is to be converted.")
+
+    parser.add_argument("-if","--input-file-format",type=str,metavar="IF",required=True,
+                        help="File format of the input file that is to be converted.")
+
+    parser.add_argument("-o","--output-file",type=str,metavar="O",required=True,
+                        help="The desired name of the converted output file.")
+
+    parser.add_argument("-of","--output-file-format",type=str,metavar="OF",required=True,
+                        help="The desired file format of the converted output file.")                
+
+    args = parser.parse_args()
+    return args
+
+def main():
+    c1 = Convert()
+    args = parseRes()
+    c1.convert_menu(args.input_file,args.output_file,
+                    args.input_file_format,args.output_file_format)
+
+if __name__ == "__main__":
+    main()
